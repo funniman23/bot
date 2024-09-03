@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import logging
 from threading import Thread
@@ -14,27 +15,36 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 app = Flask(__name__)
 
 # Replace these values with your own
-CLIENT_SECRET_FILE = 'credentials.json'
 SCOPES = ['https://www.googleapis.com/auth/youtube']
-VIDEO_ID = '69Bc2dene40'  # Replace with your live stream video ID
-COMMENT_TEXT = '/join bunalume 913674679'  # The comment you want to send
-INTERVAL = 45  # Interval in seconds between messages
+VIDEO_ID = os.environ.get('VIDEO_ID', '69Bc2dene40')  # Replace with your live stream video ID
+COMMENT_TEXT = os.environ.get('COMMENT_TEXT', '/join bunalume 913674679')  # The comment you want to send
+INTERVAL = int(os.environ.get('INTERVAL', 45))  # Interval in seconds between messages
 
 # Use environment variables for sensitive information
 CLIENT_SECRET = os.environ.get('CLIENT_SECRET')
 REDIRECT_URI = os.environ.get('REDIRECT_URI')
 
 # Create Flow instance
-flow = Flow.from_client_config(
-    client_config=eval(CLIENT_SECRET),
-    scopes=SCOPES,
-    redirect_uri=REDIRECT_URI
-)
+try:
+    client_config = json.loads(CLIENT_SECRET)
+    flow = Flow.from_client_config(
+        client_config=client_config,
+        scopes=SCOPES,
+        redirect_uri=REDIRECT_URI
+    )
+except json.JSONDecodeError:
+    logging.error("Failed to parse CLIENT_SECRET. Make sure it's a valid JSON string.")
+    flow = None
+except Exception as e:
+    logging.error(f"Error creating Flow: {str(e)}")
+    flow = None
 
 @app.route('/')
 def index():
     """Redirect to Google's OAuth 2.0 authorization URL."""
-    authorization_url, state = flow.authorization_url(
+    if not flow:
+        return "Error: OAuth flow not initialized correctly", 500
+    authorization_url, _ = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true'
     )
