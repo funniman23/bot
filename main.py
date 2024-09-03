@@ -2,7 +2,6 @@ import os
 import time
 import logging
 from threading import Thread
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 from flask import Flask, request, redirect
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
@@ -19,13 +18,17 @@ CLIENT_SECRET_FILE = 'credentials.json'
 SCOPES = ['https://www.googleapis.com/auth/youtube']
 VIDEO_ID = '69Bc2dene40'  # Replace with your live stream video ID
 COMMENT_TEXT = '/join bunalume 913674679'  # The comment you want to send
-INTERVAL = 60  # Interval in seconds between messages
+INTERVAL = 45  # Interval in seconds between messages
+
+# Use environment variables for sensitive information
+CLIENT_SECRET = os.environ.get('CLIENT_SECRET')
+REDIRECT_URI = os.environ.get('REDIRECT_URI')
 
 # Create Flow instance
-flow = Flow.from_client_secrets_file(
-    CLIENT_SECRET_FILE,
+flow = Flow.from_client_config(
+    client_config=eval(CLIENT_SECRET),
     scopes=SCOPES,
-    redirect_uri='https://ffc49be1-c58e-4161-a504-2aa36ecb94c7-00-1b0dxw056nq44.janeway.replit.dev/oauth2callback'
+    redirect_uri=REDIRECT_URI
 )
 
 @app.route('/')
@@ -45,13 +48,13 @@ def oauth2callback():
     flow.fetch_token(authorization_response=request.url)
     creds = flow.credentials
     logging.info("Credentials obtained successfully")
-
+    
     # Start the message sending loop in a separate thread
     thread = Thread(target=message_loop, args=(creds,))
     thread.start()
     logging.info("Message sending thread started")
-
-    return 'Authorization complete. Message sending loop has started. Check the console for logs.'
+    
+    return 'Authorization complete. Message sending loop has started. Check the logs for details.'
 
 def message_loop(creds):
     """Continuously send messages at regular intervals."""
@@ -59,14 +62,14 @@ def message_loop(creds):
     try:
         live_chat_id = get_live_chat_id(youtube, VIDEO_ID)
         logging.info(f'Live Chat ID obtained: {live_chat_id}')
-
+        
         while True:
             try:
                 response = send_message(youtube, live_chat_id, COMMENT_TEXT)
                 logging.info(f'Message sent successfully: {response}')
             except HttpError as e:
                 logging.error(f'An error occurred while sending the message: {e}')
-
+            
             logging.info(f'Waiting for {INTERVAL} seconds before sending the next message')
             time.sleep(INTERVAL)
     except HttpError as e:
@@ -103,5 +106,6 @@ def send_message(youtube, live_chat_id, message):
     return response
 
 if __name__ == '__main__':
-    logging.info("Starting Flask application")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Start the Flask app
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
