@@ -25,19 +25,21 @@ CLIENT_SECRET = os.environ.get('CLIENT_SECRET')
 REDIRECT_URI = os.environ.get('REDIRECT_URI')
 
 # Create Flow instance
-try:
-    client_config = json.loads(CLIENT_SECRET)
-    flow = Flow.from_client_config(
-        client_config=client_config,
-        scopes=SCOPES,
-        redirect_uri=REDIRECT_URI
-    )
-except json.JSONDecodeError:
-    logging.error("Failed to parse CLIENT_SECRET. Make sure it's a valid JSON string.")
-    flow = None
-except Exception as e:
-    logging.error(f"Error creating Flow: {str(e)}")
-    flow = None
+flow = None
+if CLIENT_SECRET:
+    try:
+        client_config = json.loads(CLIENT_SECRET)
+        flow = Flow.from_client_config(
+            client_config=client_config,
+            scopes=SCOPES,
+            redirect_uri=REDIRECT_URI
+        )
+    except json.JSONDecodeError:
+        logging.error("Failed to parse CLIENT_SECRET. Make sure it's a valid JSON string.")
+    except Exception as e:
+        logging.error(f"Error creating Flow: {str(e)}")
+else:
+    logging.error("CLIENT_SECRET environment variable is not set.")
 
 @app.route('/')
 def index():
@@ -54,6 +56,9 @@ def index():
 @app.route('/oauth2callback')
 def oauth2callback():
     """Handle the OAuth 2.0 callback and exchange the authorization code for credentials."""
+    if not flow:
+        return "Error: OAuth flow not initialized correctly", 500
+
     logging.info("Received OAuth callback")
     flow.fetch_token(authorization_response=request.url)
     creds = flow.credentials
